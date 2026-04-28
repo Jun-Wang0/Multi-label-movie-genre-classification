@@ -44,7 +44,7 @@ The implementation follows a rigorous five-stage experimental flowchart:
 4.  **Ensemble Meta-learning:** Integrating heterogeneous base-learner outputs using an MLP configuration.
 5.  **Multi-label Evaluation:** Quantitative assessment using Subset Accuracy, F1-score, Hamming Loss, and ROC-AUC.
 
-### Requirements
+## Requirements
 Ensure you have the following dependencies installed:
 ```bash
 pip install torch transformers scikit-learn numpy pandas matplotlib seaborn
