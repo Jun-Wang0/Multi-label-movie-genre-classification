@@ -22,7 +22,7 @@ The research utilizes a curated multi-label dataset harvested from the **Interne
 
 ---
 
-## 3. Repository Structure & Code Information
+## 3. Code Information
 The project is structurally organized into four functional modules, reflecting a systematic end-to-end deep learning pipeline:
 
 | Module/Folder | File Component | Key Responsibilities & Code Explanation |
