@@ -45,18 +45,7 @@ The implementation follows a rigorous five-stage experimental execution:
 
 ---
 
-## 5. Requirements
-Ensure you have the following core Python libraries and dependencies installed:
-
-```bash
-pip install torch>=1.10.0
-pip install transformers>=4.15.0
-pip install scikit-learn>=1.0.0
-pip install numpy pandas matplotlib seaborn
-
----
-
-## 6. Usage Instructions
+## 5. Usage Instructions
 
 Step 1: Clone the Repository and Prepare Data
 Place your downloaded IMDb raw data splits (e.g., train.csv, test.csv) inside a Data/ directory.
@@ -66,3 +55,14 @@ To execute the data tokenization, base-encoder training, and ensemble optimizati
 
 Step 3: Model Evaluation and Performance Metrics
 To test a trained model checkpoint and output the multi-label performance metrics.
+
+---
+
+## 6. Requirements
+Ensure you have the following core Python libraries and dependencies installed:
+
+```bash
+pip install torch>=1.10.0
+pip install transformers>=4.15.0
+pip install scikit-learn>=1.0.0
+pip install numpy pandas matplotlib seaborn
