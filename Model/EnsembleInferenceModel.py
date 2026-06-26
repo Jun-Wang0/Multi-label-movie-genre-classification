@@ -5,7 +5,6 @@ import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-
 from BILSTMModel import BiLSTMClassifier
 from RobertaMultiInputMultiLabelClassifier import RobertaMultiInputMultiLabelClassifier
 from DebertaMultiInputMultiLabelClassifier import DebertaMultiInputMultiLabelClassifier
@@ -15,26 +14,26 @@ class EnsembleInferenceModel(nn.Module):
         super().__init__()
         self.device = device
 
-        # 加载三个子模型
-        self.bilstm = BiLSTMClassifier  # 确保结构一致
+        # Load the three sub-models (Added parentheses to instantiate them)
+        self.bilstm = BiLSTMClassifier()  # Ensure the architecture matches the saved weights
         self.bilstm.load_state_dict(torch.load(bilstm_path, map_location=device))
         self.bilstm.to(device)
         self.bilstm.eval()
 
-        self.roberta = RobertaMultiInputMultiLabelClassifier
+        self.roberta = RobertaMultiInputMultiLabelClassifier()
         self.roberta.load_state_dict(torch.load(roberta_path, map_location=device))
         self.roberta.to(device)
         self.roberta.eval()
 
-        self.deberta = DebertaMultiInputMultiLabelClassifier
+        self.deberta = DebertaMultiInputMultiLabelClassifier()
         self.deberta.load_state_dict(torch.load(deberta_path, map_location=device))
         self.deberta.to(device)
         self.deberta.eval()
 
-        # 获取子模型输出维度
+        # Calculate the total hidden dimension from the sub-models
         total_hidden = self.bilstm.output_dim + self.roberta.output_dim + self.deberta.output_dim
 
-        # MLP 分类器
+        # MLP Classifier
         self.classifier = nn.Sequential(
             nn.Linear(total_hidden, hidden_size),
             nn.ReLU(),
@@ -52,5 +51,5 @@ class EnsembleInferenceModel(nn.Module):
         logits = self.classifier(fused)
         print('logits')
         print(logits)
-        print(ssss)
+        # print(ssss)  # Commented out to prevent NameError
         return logits
