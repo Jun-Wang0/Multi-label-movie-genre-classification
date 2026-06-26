@@ -14,12 +14,12 @@ from TorchDataset.RobertaMultiInputDataset import RobertaMultiInputDataset
 from metrixCaler import evaluate_metrics
 
 def load_model(model_path, device='cuda'):
-    # 初始化模型结构（必须与保存时一致）
+    # Initialize the model architecture (must exactly match the saved model state)
     model = RobertaMultiInputMultiLabelClassifier()
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
     model.eval()
-    print(f"✅ 模型已加载: {model_path}")
+    print(f"✅ Model successfully loaded from: {model_path}")
     return model
 
 def evaluate(model, dataloader, device):
@@ -43,11 +43,12 @@ def evaluate(model, dataloader, device):
     preds = torch.cat(all_preds, dim=0)
     labels = torch.cat(all_labels, dim=0)
     report = classification_report(labels, preds, zero_division=0, output_dict=True)
-    acc = 0#(preds == labels).float().mean(dim=0).mean().item()
-    metrix = evaluate_metrics(preds,labels)
+    
+    acc = 0 # (preds == labels).float().mean(dim=0).mean().item()
+    metrix = evaluate_metrics(preds, labels)
     print(metrix)
     acc = metrix['accuracy']
-    #print(f"✅ Val Accuracy: {acc:.4f}")
+    # print(f"✅ Val Accuracy: {acc:.4f}")
     return acc
     
 def train():
@@ -61,10 +62,10 @@ def train():
     model = RobertaMultiInputMultiLabelClassifier().to(device)
     optimizer = AdamW(model.parameters(), lr=2e-5)
     criterion = nn.BCEWithLogitsLoss()
+    
     model = load_model("../weights/best_model_sr.pt", device)
     best_acc = 0.0
     val_acc = evaluate(model, val_loader, device)
 
 if __name__ == "__main__":
     train()
-    
