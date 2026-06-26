@@ -53,7 +53,7 @@ class RobertaTextDataset(torch.utils.data.Dataset):
         return [self.norm_single(tensor) for tensor in transformed]
 
     def _preprocess_all(self):
-        print(f"开始编码文本和生成所有中间嵌入（共 {len(self.data)} 条数据）...")
+        print(f"Starting text encoding and generating all intermediate embeddings ({len(self.data)} records in total)...")
 
         temp_title_raw = []
         temp_summaries_raw = []
@@ -72,12 +72,12 @@ class RobertaTextDataset(torch.utils.data.Dataset):
         del self.model
         torch.cuda.empty_cache()
 
-        print("Transformer 处理原始嵌入...")
+        print("Processing raw embeddings with Transformer...")
         self.title_tf_list = self._transform_and_norm(self.title_embedding_list)
         self.summaried_tf_list = self._transform_and_norm(self.summaried_embedding_list)
         self.synopsis_tf_list = self._transform_and_norm(self.synopsis_embedding_list)
 
-        print("生成最终多模态 embedding...")
+        print("Generating the final multi-modal embeddings...")
         for t, s, y in tqdm(zip(self.title_tf_list, self.summaried_tf_list, self.synopsis_tf_list), 
                             total=len(self.title_tf_list), desc="Generating multi-modal embedding"):
             concat = torch.cat([t, s, y], dim=0) 
@@ -85,7 +85,7 @@ class RobertaTextDataset(torch.utils.data.Dataset):
             self.multiembedding_list.append(self.norm_single(reduced))
 
         self.labels_tensor = torch.tensor(self.data[self.label_columns].values, dtype=torch.float32).to(self.device)
-        print("预处理完成.")
+        print("Preprocessing complete.")
 
     def __len__(self):
         return len(self.data)
