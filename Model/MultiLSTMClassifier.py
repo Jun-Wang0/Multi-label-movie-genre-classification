@@ -19,12 +19,12 @@ class MultiLSTMClassifier(nn.Module):
         outputs = []
 
         for i in range(self.num_labels):
-            lstm_out, _ = self.lstm_list[i](x)         # (batch_size, seq_len, hidden_dim)
-            final_hidden = lstm_out[:, -1, :]           # 取最后一个时刻的 hidden
+            lstm_out, _ = self.lstm_list[i](x)          # (batch_size, seq_len, hidden_dim)
+            final_hidden = lstm_out[:, -1, :]           # Extract the hidden state of the last time step
             final_hidden = self.dropout(final_hidden)
             out = self.output_layers[i](final_hidden)   # (batch_size, 1)
             outputs.append(out)
 
-        # 拼接为 (batch_size, 27)
+        # Concatenate to shape (batch_size, 27)
         logits = torch.cat(outputs, dim=1)
-        return logits  # 不加 sigmoid（交给 BCEWithLogitsLoss）
+        return logits  # No sigmoid applied (deferred to BCEWithLogitsLoss)
