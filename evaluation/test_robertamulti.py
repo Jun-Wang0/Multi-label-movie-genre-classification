@@ -53,22 +53,31 @@ def evaluate(model, dataloader, device):
     preds = torch.cat(all_preds, dim=0)
     labels = torch.cat(all_labels, dim=0)
 
-    # 方式二：逐标签准确率
+    # Method 2: Per-label accuracy
     acc = ((preds == labels).float().mean(dim=0)).mean().item()
-    #acc = (preds == labels).all(dim=1).float().mean().item()
+    # acc = (preds == labels).all(dim=1).float().mean().item()  # Strict exact match accuracy
     print(f"✅ Multi-label Accuracy: {acc:.12f}")
     return acc
 
 # =============== Main ===============
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     trainpath = '/root/autodl-tmp/MovieLabeling/datasets/train_data.csv'
     traindataset = RobertaTextDataset(csv_file=trainpath, device='cuda')
+    
     testpath = '/root/autodl-tmp/MovieLabeling/datasets/test_data.csv'
     testdataset = RobertaTextDataset(csv_file=testpath, device='cuda')
     
+    # ✅ Added missing DataLoaders
+    train_loader = DataLoader(traindataset, batch_size=32, shuffle=True)
+    val_loader = DataLoader(testdataset, batch_size=32, shuffle=False)
 
     model = MultiLSTMClassifier(input_dim=1024, hidden_dim=128, num_labels=27).to(device)
+    
+    # ✅ Added missing optimizer and criterion
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    criterion = nn.BCEWithLogitsLoss()
     
     best_acc = 0.0
     num_epochs = 2000
@@ -77,12 +86,12 @@ def main():
         print(f"[Epoch {epoch+1}] Train Loss: {train_loss:.12f}")
 
         acc = evaluate(model, val_loader, device)
-        print(f"[Epoch {epoch+1}] Val Macro F1: {acc:.12f}")
+        print(f"[Epoch {epoch+1}] Val Accuracy: {acc:.12f}")
 
         if acc > best_acc:
             best_acc = acc
             torch.save(model.state_dict(), "../weights/best_model.pt")
-            print(f"✅ Saved new best model at epoch {epoch+1} (F1: {acc:.12f})")
+            print(f"✅ Saved new best model at epoch {epoch+1} (Accuracy: {acc:.12f})")
 
 if __name__ == "__main__":
     main()
