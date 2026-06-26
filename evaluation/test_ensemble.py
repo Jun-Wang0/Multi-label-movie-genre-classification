@@ -15,7 +15,7 @@ from TorchDataset.EnsembleDataset import EnsembleDataset
 from metrixCaler import evaluate_metrics
 
 
-# ==== 屏蔽transformers的warning ====
+# ==== Suppress transformers warnings ====
 logging.set_verbosity_error()
 
 
@@ -26,13 +26,13 @@ from sklearn.preprocessing import label_binarize
 
 def plot_multiclass_roc(y_true, y_score, num_classes, save_path=None):
     """
-    绘制多分类 ROC 曲线，并可保存图片。
+    Plots the multiclass ROC curve and optionally saves the image.
     
-    参数:
-    y_true: 长度为N的真实标签（整数类别）
-    y_score: N×C 的概率数组，C为类别数
-    num_classes: 类别数量
-    save_path: 如果不为 None，则保存图像到该路径（如 'roc_curve.png'）
+    Args:
+    y_true: Ground truth labels of length N (integer classes).
+    y_score: N x C probability array, where C is the number of classes.
+    num_classes: Number of classes.
+    save_path: If not None, saves the plot to this path (e.g., 'roc_curve.png').
     """
     y_test = label_binarize(y_true, classes=range(num_classes))
     y_test = np.array(y_test)
@@ -58,14 +58,14 @@ def plot_multiclass_roc(y_true, y_score, num_classes, save_path=None):
     plt.legend(loc='lower right', fontsize='small')
     plt.grid(True)
 
-    # 保存图像
+    # Save the image
     if save_path:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        print(f"✅ ROC 图已保存至: {save_path}")
+        print(f"✅ ROC plot saved to: {save_path}")
 
-    #plt.show()
+    # plt.show()
 
-# ==== 加载子模型 ====
+# ==== Load sub-models ====
 def load_model(path='bilstm_model.pt', device='cpu'):
     checkpoint = torch.load(path, map_location=device)
     model = BiLSTMClassifier(num_classes=27).to(device)
@@ -75,20 +75,20 @@ def load_model(path='bilstm_model.pt', device='cpu'):
 
 def strict_accuracy(preds: torch.Tensor, labels: torch.Tensor) -> float:
     """
-    计算严格准确率：所有标签都完全匹配才算正确。
+    Calculate strict accuracy: all labels must match perfectly to be considered correct.
     
-    参数:
-        preds (torch.Tensor): 预测结果，形状为 (batch_size, num_labels)，值为 0 或 1。
-        labels (torch.Tensor): 真实标签，形状相同。
+    Args:
+        preds (torch.Tensor): Predictions, shape (batch_size, num_labels), values 0 or 1.
+        labels (torch.Tensor): True labels, same shape as preds.
         
-    返回:
-        float: 严格准确率。
+    Returns:
+        float: Strict exact match accuracy.
     """
-    correct = (preds == labels).all(dim=1).float()  # 每一行是否全部匹配
+    correct = (preds == labels).all(dim=1).float()  # Check if every label in a row matches
     acc = correct.mean().item()
     return acc
 
-# ==== 集成模型结构 ====
+# ==== Ensemble Model Architecture ====
 class EnsembleClassifier(nn.Module):
     def __init__(self, bilstm, roberta, deberta, hidden_dim=512, num_labels=27):
         super().__init__()
@@ -118,24 +118,17 @@ class EnsembleClassifier(nn.Module):
                 deberta_input['input1'], deberta_input['input2'], deberta_input['input3']
             )
         
-        # print(f'v1')
-        # print(v1)
-        # print(f'v2')
-        # print(v2)
-        # print(f'v3')
-        # print(v3)
         fused = torch.cat([v1, v2, v3], dim=1)
         logits = self.classifier(fused)
-        # print('logits')
-        # print(logits)
         return logits
 
 
-# ==== 测试函数 ====
+# ==== Test Function ====
 def test(model, dataloader, device):
     model.eval()
     all_preds = []
     all_labels = []
+    all_probs = []  # Added tracking for raw probabilities for the ROC curve
 
     with torch.no_grad():
         for batch in dataloader:
@@ -158,51 +151,52 @@ def test(model, dataloader, device):
 
             all_preds.append(preds.cpu())
             all_labels.append(labels.cpu())
+            all_probs.append(probs.cpu())  # Store valid sigmoid probabilities
 
     preds = torch.cat(all_preds)
     labels = torch.cat(all_labels)
-    metrix = evaluate_metrics(preds,labels)
+    probs_tensor = torch.cat(all_probs)  # Compile the continuous probabilities
+    
+    metrix = evaluate_metrics(preds, labels)
     print(metrix)
     
-    acc = strict_accuracy(preds,labels)
+    acc = strict_accuracy(preds, labels)
     print(f'acc = {acc}')
     print("\n📊 Classification Report:")
     print(classification_report(labels, preds, zero_division=0))
-    # 概率分布
-    probs = torch.softmax(preds.float(), dim=1)
 
-    # 🎯 绘制 ROC 曲线
+    # 🎯 Plot ROC Curve (now uses correct sigmoid probabilities instead of softmaxing binary predictions)
     plot_multiclass_roc(
         y_true=labels.cpu().numpy(),
-        y_score=probs.cpu().numpy(),
-        num_classes=probs.size(1),
+        y_score=probs_tensor.cpu().numpy(), 
+        num_classes=probs_tensor.size(1),
         save_path='roc_curve.png'
     )
     
     return preds
 
 
-# ==== 主入口 ====
+# ==== Main Entry Point ====
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # 加载子模型
+    # Load sub-models
     bilstm = load_model('../weights/bilstm_model_0.9.pt', device=device)
     roberta = RobertaMultiInputMultiLabelClassifier()
     roberta.load_state_dict(torch.load('../weights/best_model_sr.pt'))
     deberta = DebertaMultiInputMultiLabelClassifier()
     deberta.load_state_dict(torch.load('../weights/best_model_sd.pt'))
 
-    # 构建集成模型并加载权重
+    # Build the ensemble model and load weights
     model = EnsembleClassifier(bilstm, roberta, deberta).to(device)
     model.load_state_dict(torch.load('../weights/best_ensemble.pt', map_location=device))
     model.eval()
 
-    # 加载测试数据
+    # Load test data
     test_dataset = EnsembleDataset(csv_file='/root/autodl-tmp/MovieLabeling/datasets/test_data.csv')
     test_loader = DataLoader(test_dataset, batch_size=16)
 
-    # 开始测试
+    # Start testing
     test(model, test_loader, device)
 
 
