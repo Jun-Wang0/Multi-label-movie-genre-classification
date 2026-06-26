@@ -22,7 +22,7 @@ class RobertaEncoderOnEmbeddings(nn.Module):
         position_embeddings = self.embeddings.position_embeddings(position_ids)
         hidden_states = x + position_embeddings
 
-        # ✅ 用 base_model 调用 get_extended_attention_mask
+        # ✅ Call get_extended_attention_mask using the base_model
         extended_attention_mask = self.base_model.get_extended_attention_mask(
             attention_mask, input_shape=(batch_size, seq_len), device=device
         )
@@ -30,6 +30,6 @@ class RobertaEncoderOnEmbeddings(nn.Module):
         encoder_outputs = self.encoder(hidden_states, attention_mask=extended_attention_mask)
         sequence_output = encoder_outputs[0]  # shape: (batch, 7, 1024)
 
-        pooled = sequence_output[:, 0, :]  # or mean pooling
+        pooled = sequence_output[:, 0, :]  # Using the first token for pooling
         out = self.dropout(pooled)
         return self.classifier(out)
