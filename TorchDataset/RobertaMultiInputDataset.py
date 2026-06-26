@@ -9,7 +9,7 @@ class RobertaMultiInputDataset(Dataset):
         self.tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name)
         self.max_len = max_len
 
-        # 假设前3列是输入，后面是27个标签
+        # Assuming the first 3 columns are text inputs, and the remaining columns are the 27 labels
         self.input_texts = self.data.iloc[:, 0:3].values.tolist()
         self.labels = self.data.iloc[:, 3:].values.astype(float)
 
@@ -38,4 +38,3 @@ class RobertaMultiInputDataset(Dataset):
             'labels': torch.tensor(self.labels[idx], dtype=torch.float)
         }
         return item
-
