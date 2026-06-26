@@ -12,14 +12,14 @@ class RobertaTextDataset(Dataset):
         self.tokenizer = RobertaTokenizer.from_pretrained('/root/autodl-tmp/huggingface/roberta-large')
         self.model = RobertaModel.from_pretrained('/root/autodl-tmp/huggingface/roberta-large').to(device)
         self.model.eval()
-    
+        
         self.max_length = max_length
         self.proj_concat = nn.Linear(3072, 1024).to(device)
         
         encoder_layer = TransformerEncoderLayer(d_model=1024, nhead=8).to(device)
         self.transformer = TransformerEncoder(encoder_layer, num_layers=1).to(device)
-        self.norm_single = LayerNorm(1024).to(device)   # 用于每个 embedding（title、summary、synopsis）
-        self.norm_concat = LayerNorm(3072).to(device)   # 用于 concat 后的多模态向量
+        self.norm_single = LayerNorm(1024).to(device)   # Used for each individual embedding (title, summary, synopsis)
+        self.norm_concat = LayerNorm(3072).to(device)   # Used for the concatenated multi-modal vector
 
         self.titleembedding = []
         self.summariedembedding = []
@@ -29,7 +29,7 @@ class RobertaTextDataset(Dataset):
         self.synopsisembeddingaftertf = []
         self.multiembedding = []
 
-        # 27类标签字段名
+        # 27 genre label column names
         self.label_columns = [
             "Drama", "Thriller", "Comedy", "Action", "Adventure", "Crime", "Romance", "Mystery", "Sci-Fi", "Fantasy",
             "Horror", "Dark Comedy", "Family", "Period Drama", "Biography", "Animation", "Romantic Comedy", "Tragedy",
@@ -51,42 +51,41 @@ class RobertaTextDataset(Dataset):
         return [self.norm_single(tensor) for tensor in transformed]
 
     def _preprocess_all(self):
-        print("开始编码文本...")
+        print("Starting text encoding...")
 
         for _, row in self.data.iterrows():
             self.titleembedding.append(self._get_embedding(str(row['title'])))
             self.summariedembedding.append(self._get_embedding(str(row['summaries'])))
             self.synopsisembedding.append(self._get_embedding(str(row['synopsis'])))
 
-        print("Transformer处理...")
+        print("Applying Transformer processing...")
         self.titleembeddingaftertf = self._transform_and_norm(self.titleembedding)
         self.summariedembeddingaftertf = self._transform_and_norm(self.summariedembedding)
         self.synopsisembeddingaftertf = self._transform_and_norm(self.synopsisembedding)
 
-        print("生成最终多模态embedding...")
+        print("Generating final multi-modal embedding...")
         for t, s, y in zip(self.titleembeddingaftertf, self.summariedembeddingaftertf, self.synopsisembeddingaftertf):
             concat = torch.cat([t, s, y], dim=0)  # shape: (3072,)
             reduced = self.proj_concat(concat)    # shape: (1024,)
             self.multiembedding.append(self.norm_single(reduced))  # norm over 1024
         self.labels = torch.tensor(self.data[self.label_columns].values, dtype=torch.float32).to(self.device)
-        print("预处理完成.")
+        print("Preprocessing complete.")
 
     def __len__(self):
         return len(self.data)
         
     def __getitem__(self, idx):
-        item = self.data.iloc[idx]
-
-        # 从缓存或重新计算得到 embedding
-        title_embedding = torch.tensor(self.titleembedding[idx])           # (1024,)
-        summaried_embedding = torch.tensor(self.summariedembedding[idx])   # (1024,)
-        synopsis_embedding = torch.tensor(self.synopsisembedding[idx])     # (1024,)
-        title_tf = torch.tensor(self.titleembeddingaftertf[idx])                          # (1024,)
-        summaried_tf = torch.tensor(self.summariedembeddingaftertf[idx])                  # (1024,)
-        synopsis_tf = torch.tensor(self.synopsisembeddingaftertf[idx])                    # (1024,)
-        multi_embedding = torch.tensor(self.multiembedding[idx])            # (1024,)
+        # Retrieve embeddings from cache
+        # Note: Using clone().detach() prevents PyTorch UserWarnings caused by passing tensors to torch.tensor()
+        title_embedding = self.titleembedding[idx].clone().detach()            # (1024,)
+        summaried_embedding = self.summariedembedding[idx].clone().detach()    # (1024,)
+        synopsis_embedding = self.synopsisembedding[idx].clone().detach()      # (1024,)
+        title_tf = self.titleembeddingaftertf[idx].clone().detach()            # (1024,)
+        summaried_tf = self.summariedembeddingaftertf[idx].clone().detach()    # (1024,)
+        synopsis_tf = self.synopsisembeddingaftertf[idx].clone().detach()      # (1024,)
+        multi_embedding = self.multiembedding[idx].clone().detach()            # (1024,)
     
-        # 选 6 个组成最终 tensor
+        # Stack the 7 embeddings to form the final tensor
         emb_list = [
             title_embedding,
             summaried_embedding,
@@ -96,9 +95,9 @@ class RobertaTextDataset(Dataset):
             synopsis_tf,
             multi_embedding
         ]
-        embeddings = torch.stack(emb_list)   # (6, 1024)
+        embeddings = torch.stack(emb_list)   # (7, 1024)
     
-        label = torch.tensor(self.labels[idx], dtype=torch.float32)  # (27,)
+        label = self.labels[idx].clone().detach()  # (27,)
     
         return {
             'embeddings': embeddings,
