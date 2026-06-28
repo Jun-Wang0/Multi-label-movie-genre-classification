@@ -14,7 +14,7 @@ def collate_fn(batch):
     all_labels = []
 
     for item in batch:
-        # 拼接6个embedding向量 → 每个样本为 (7, 1024)
+        # Concatenate the 6 embedding vectors -> Each sample becomes (7, 1024)
         # emb_list = [
         #     # item['title_embedding'],
         #     # item['summaried_embedding'],
@@ -26,7 +26,7 @@ def collate_fn(batch):
         # emb_tensor = torch.stack(emb_list)
         all_inputs.append(item['embeddings'])
 
-        # 使用真实的 27 维标签向量
+        # Use the actual 27-dimensional label vector
         all_labels.append(item['labels'])
 
     inputs_tensor = torch.stack(all_inputs)  # (batch, 6, 1024)
@@ -40,7 +40,7 @@ def save_model(model, path='bilstm_model.pt'):
         'model_state_dict': model.state_dict(),
         'model_class': model.__class__.__name__
     }, path)
-    print(f"模型已保存到: {path}")
+    print(f"Model successfully saved to: {path}")
 
 
 def train_model(dataset, device='cuda', num_epochs=50, batch_size=8, lr=1e-4, save_path='../weights/bilstm_model_6.pt'):
@@ -71,7 +71,7 @@ def train_model(dataset, device='cuda', num_epochs=50, batch_size=8, lr=1e-4, sa
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch {epoch+1}/{num_epochs} - Avg Loss: {avg_loss:.4f}")
 
-        # 保存最优模型（按 loss）
+        # Save the best model (based on loss)
         if avg_loss < best_loss:
             best_loss = avg_loss
             save_model(model, save_path)
