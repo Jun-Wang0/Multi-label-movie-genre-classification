@@ -53,8 +53,8 @@ def evaluate(model, dataloader, device):
     preds = torch.cat(all_preds, dim=0)
     labels = torch.cat(all_labels, dim=0)
 
-    # 方式二：逐标签准确率
-    #acc = ((preds == labels).float().mean(dim=0)).mean().item()
+    # Method 2: Exact Match Accuracy (All labels must match)
+    # acc = ((preds == labels).float().mean(dim=0)).mean().item()
     acc = (preds == labels).all(dim=1).float().mean().item()
     print(f"✅ Multi-label Accuracy: {acc:.4f}")
     return acc
@@ -81,12 +81,12 @@ def main():
         print(f"[Epoch {epoch+1}] Train Loss: {train_loss:.4f}")
 
         acc = evaluate(model, val_loader, device)
-        print(f"[Epoch {epoch+1}] Val Macro F1: {acc:.4f}")
+        print(f"[Epoch {epoch+1}] Val Accuracy: {acc:.4f}")
 
         if acc > best_acc:
             best_acc = acc
             torch.save(model.state_dict(), "../weights/best_model.pt")
-            print(f"✅ Saved new best model at epoch {epoch+1} (F1: {acc:.4f})")
+            print(f"✅ Saved new best model at epoch {epoch+1} (Accuracy: {acc:.4f})")
 
 if __name__ == "__main__":
     main()
