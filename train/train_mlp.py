@@ -11,9 +11,10 @@ from Model.BILSTMModel import BiLSTMClassifier
 from Model.RobertaMultiInputMultiLabelClassifier import RobertaMultiInputMultiLabelClassifier
 from Model.DebertaMultiInputMultiLabelClassifier import DebertaMultiInputMultiLabelClassifier
 
-from TorchDataset.EnsembleDataset import EnsembleDataset  # 你需实现此类
+from TorchDataset.EnsembleDataset import EnsembleDataset  # You need to implement this class
 from sklearn.metrics import classification_report
 
+# ==== Suppress transformers warnings ====
 logging.set_verbosity_error()
 
 def load_model(path='bilstm_model.pt', device='cpu'):
@@ -22,14 +23,14 @@ def load_model(path='bilstm_model.pt', device='cpu'):
     if checkpoint['model_class'] == 'BiLSTMClassifier':
         model = BiLSTMClassifier(num_classes=27).to(device)
     else:
-        raise ValueError(f"未知模型类型: {checkpoint['model_class']}")
+        raise ValueError(f"Unknown model type: {checkpoint['model_class']}")
 
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
-    print(f"模型已从 {path} 加载")
+    print(f"Model loaded from {path}")
     return model
 
-# === 集成模型 === #
+# === Ensemble Model === #
 class EnsembleClassifier(nn.Module):
     def __init__(self, bilstm, roberta, deberta, hidden_dim=512, num_labels=27):
         super().__init__()
@@ -37,9 +38,9 @@ class EnsembleClassifier(nn.Module):
         self.roberta = roberta.eval()
         self.deberta = deberta.eval()
 
-        self.bilstm_output_dim = 27# bilstm.output_dim
-        self.roberta_output_dim = 27# roberta.output_dim
-        self.deberta_output_dim = 27# deberta.output_dim
+        self.bilstm_output_dim = 27
+        self.roberta_output_dim = 27
+        self.deberta_output_dim = 27
 
         total_dim = self.bilstm_output_dim + self.roberta_output_dim + self.deberta_output_dim
         self.classifier = nn.Sequential(
@@ -49,7 +50,7 @@ class EnsembleClassifier(nn.Module):
             nn.Linear(hidden_dim, num_labels)
         )
 
-        # 冻结三个模型
+        # Freeze the three models
         for p in self.bilstm.parameters(): p.requires_grad = False
         for p in self.roberta.parameters(): p.requires_grad = False
         for p in self.deberta.parameters(): p.requires_grad = False
@@ -57,22 +58,18 @@ class EnsembleClassifier(nn.Module):
     def forward(self, bilstm_input, roberta_input, deberta_input):
         with torch.no_grad():
             v1 = self.bilstm(bilstm_input)  # (B, D1)
-            v2 = self.roberta(roberta_input['input1'],roberta_input['input2'],roberta_input['input3'])  # (B, D2)
-            v3 = self.deberta(deberta_input['input1'],deberta_input['input2'],deberta_input['input3'])  # (B, D3)
-        print(f'v1')
-        print(v1)
-        print(f'v2')
-        print(v2)
-        print(f'v3')
-        print(v3)
+            v2 = self.roberta(roberta_input['input1'], roberta_input['input2'], roberta_input['input3'])  # (B, D2)
+            v3 = self.deberta(deberta_input['input1'], deberta_input['input2'], deberta_input['input3'])  # (B, D3)
+        print(f'v1\n{v1}')
+        print(f'v2\n{v2}')
+        print(f'v3\n{v3}')
         fused = torch.cat([v1, v2, v3], dim=1)
         logits = self.classifier(fused)
-        print('logits')
-        print(logits)
+        print(f'logits\n{logits}')
         return logits
         
 
-# === 训练函数 === #
+# === Training Function === #
 def train(model, dataloader, optimizer, criterion, device):
     model.train()
     total_loss = 0
@@ -102,7 +99,7 @@ def train(model, dataloader, optimizer, criterion, device):
     return total_loss / len(dataloader)
 
 
-# === 验证函数 === #
+# === Evaluation Function === #
 def evaluate(model, dataloader, device):
     model.eval()
     all_preds, all_labels = [], []
@@ -137,37 +134,33 @@ def evaluate(model, dataloader, device):
     return report["macro avg"]["f1-score"]
 
 
-# === 主函数 === #
+# === Main Function === #
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # === 加载子模型 === #
-    bilstm = load_model('../weights/bilstm_model_0.9.pt')#BiLSTMClassifier(num_classes=27)
-    #bilstm.load_state_dict(torch.load('../weights/bilstm_model_0.9.pt'))
-    #bilstm.output_dim = 128  # 你必须设置此属性
-
+    # === Load Sub-models === #
+    bilstm = load_model('../weights/bilstm_model_0.9.pt')
+    
     roberta = RobertaMultiInputMultiLabelClassifier()
     roberta.load_state_dict(torch.load('../weights/best_model_sr.pt'))
-    #roberta.output_dim = 1024
-
+    
     deberta = DebertaMultiInputMultiLabelClassifier()
     deberta.load_state_dict(torch.load('../weights/best_model_sd.pt'))
-    #deberta.output_dim = 1024
-
-    # === 构建集成模型 === #
+    
+    # === Build Ensemble Model === #
     model = EnsembleClassifier(bilstm, roberta, deberta).to(device)
 
-    # === 加载数据 === #
+    # === Load Data === #
     train_dataset = EnsembleDataset(csv_file='/root/autodl-tmp/MovieLabeling/datasets/train_data.csv')
     val_dataset = EnsembleDataset(csv_file='/root/autodl-tmp/MovieLabeling/datasets/test_data.csv')
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=16)
 
-    # === 优化器和损失 === #
+    # === Optimizer and Loss === #
     optimizer = torch.optim.AdamW(model.classifier.parameters(), lr=2e-5)
     criterion = nn.BCEWithLogitsLoss()
 
-    # === 训练过程 === #
+    # === Training Process === #
     best_f1 = 0
     for epoch in range(20):
         train_loss = train(model, train_loader, optimizer, criterion, device)
